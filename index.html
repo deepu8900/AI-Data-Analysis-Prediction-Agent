@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ML Prediction Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:      #09090f;
+    --panel:   #10111a;
+    --border:  #1c1e2e;
+    --accent:  #00e5b0;
+    --red:     #ff4d6a;
+    --blue:    #4d9fff;
+    --amber:   #ffb547;
+    --purple:  #9b7dff;
+    --text:    #e4e6f0;
+    --muted:   #5a5d78;
+    --font:    'Syne', sans-serif;
+    --mono:    'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    display: flex;
+  }
+
+
+  #sidebar {
+    width: 200px;
+    min-height: 100vh;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    position: fixed;
+    top: 0; left: 0;
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+  }
+
+  .brand {
+    padding: 0 20px 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .brand-icon {
+    width: 34px; height: 34px;
+    background: rgba(0,229,176,.12);
+    border: 1px solid rgba(0,229,176,.25);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 10px;
+    font-size: 16px;
+  }
+  .brand-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .brand-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+    transition: all .15s;
+    border-left: 2px solid transparent;
+  }
+  nav a:hover { color: var(--text); background: rgba(255,255,255,.03); }
+  nav a.active { color: var(--accent); border-left-color: var(--accent); background: rgba(0,229,176,.05); }
+  nav .nav-icon { font-size: 14px; width: 18px; text-align: center; }
+
+  .model-card {
+    margin: auto 16px 0;
+    padding: 12px 14px;
+    background: rgba(0,229,176,.05);
+    border: 1px solid rgba(0,229,176,.12);
+    border-radius: 8px;
+    font-size: 11px;
+  }
+  .model-card-label { color: var(--accent); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 6px; }
+  .model-card-row { display: flex; justify-content: space-between; color: var(--muted); margin-top: 3px; }
+  .model-card-row span:last-child { color: var(--accent); font-family: var(--mono); }
+
+
+  #main {
+    margin-left: 200px;
+    flex: 1;
+    padding: 36px 40px;
+    max-width: calc(100vw - 200px);
+  }
+
+
+  .page { display: none; animation: fadeUp .3s ease; }
+  .page.active { display: block; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .page-header { margin-bottom: 28px; }
+  .page-title  { font-size: 26px; font-weight: 700; color: var(--text); line-height: 1.2; }
+  .page-sub    { font-size: 14px; color: var(--muted); margin-top: 5px; }
+
+  
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+  }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 14px;
+  }
+
+
+  .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 24px; }
+
+  .stat-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+  .stat-value { font-size: 26px; font-weight: 700; font-family: var(--mono); line-height: 1; }
+  .stat-hint  { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+ 
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; }
+
+  label.field-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: 6px;
+  }
+
+  input[type=number], input[type=text], textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  input::placeholder, textarea::placeholder { color: var(--muted); }
+
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 22px;
+    border-radius: 8px;
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: opacity .15s, transform .1s;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  .btn-primary { background: var(--accent); color: #09090f; }
+  .btn-primary:hover:not(:disabled) { opacity: .9; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Tags ────────────────────────────────────── */
+  .tag {
+    display: inline-flex; align-items: center;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: .03em;
+  }
+  .tag-green  { background: rgba(0,229,176,.1);  color: var(--accent); border: 1px solid rgba(0,229,176,.2); }
+  .tag-red    { background: rgba(255,77,106,.1);  color: var(--red);    border: 1px solid rgba(255,77,106,.2); }
+  .tag-yellow { background: rgba(255,181,71,.1);  color: var(--amber);  border: 1px solid rgba(255,181,71,.2); }
+  .tag-blue   { background: rgba(77,159,255,.1);  color: var(--blue);   border: 1px solid rgba(77,159,255,.2); }
+
+  /* ── Result card ─────────────────────────────── */
+  #predict-result {
+    display: none;
+    margin-top: 20px;
+  }
+
+  .result-main {
+    display: flex; align-items: center; gap: 16px;
+    padding: 20px 24px;
+    border-radius: 10px;
+    margin-bottom: 14px;
+  }
+  .result-icon { font-size: 36px; }
+  .result-label { font-size: 28px; font-weight: 700; line-height: 1; }
+  .result-conf  { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  .result-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+  .result-cell {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .result-cell-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+  .result-cell-val   { font-size: 16px; font-weight: 600; font-family: var(--mono); }
+
+  /* ── SHAP bars ───────────────────────────────── */
+  .shap-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .shap-name  { width: 120px; font-size: 13px; color: var(--text); flex-shrink: 0; }
+  .shap-bar-wrap { flex: 1; position: relative; height: 8px; background: var(--bg); border-radius: 4px; overflow: visible; }
+  .shap-bar   { height: 100%; border-radius: 4px; transition: width .4s ease; }
+  .shap-val   { width: 70px; font-size: 12px; font-family: var(--mono); text-align: right; flex-shrink: 0; }
+
+  /* ── Drift rows ──────────────────────────────── */
+  .drift-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px;
+    border-radius: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color .15s;
+  }
+  .drift-row:hover { border-color: var(--muted); }
+  .drift-row.drifted { border-color: rgba(255,77,106,.35); }
+
+  .drift-name   { font-size: 14px; font-weight: 500; min-width: 130px; }
+  .drift-scores { display: flex; gap: 20px; font-size: 13px; font-family: var(--mono); }
+  .drift-score-item { display: flex; flex-direction: column; align-items: flex-end; }
+  .drift-score-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+
+  /* ── Alert banner ────────────────────────────── */
+  .alert-banner {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    font-size: 14px;
+  }
+  .alert-danger  { background: rgba(255,77,106,.07);  border: 1px solid rgba(255,77,106,.3);  color: var(--red); }
+  .alert-success { background: rgba(0,229,176,.07);   border: 1px solid rgba(0,229,176,.25);  color: var(--accent); }
+
+  /* ── NL Chat ─────────────────────────────────── */
+  #chat-messages {
+    display: flex; flex-direction: column; gap: 14px;
+    min-height: 80px;
+    margin-bottom: 20px;
+  }
+
+  .msg-user {
+    align-self: flex-end;
+    background: rgba(0,229,176,.1);
+    border: 1px solid rgba(0,229,176,.2);
+    border-radius: 12px 12px 2px 12px;
+    padding: 10px 16px;
+    max-width: 70%;
+    font-size: 14px;
+  }
+
+  .msg-bot {
+    align-self: flex-start;
+    max-width: 88%;
+  }
+  .msg-bot-answer {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 2px 12px 12px 12px;
+    padding: 12px 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 6px;
+  }
+  .msg-bot-sql {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .msg-bot-tag { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); margin-bottom: 6px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .chip {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  .chat-input-row { display: flex; gap: 10px; }
+  .chat-input-row textarea { flex: 1; resize: none; font-size: 14px; }
+
+  /* ── Scrollbar ───────────────────────────────── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--panel); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── Loading dots ────────────────────────────── */
+  .dots span {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--accent);
+    margin: 0 2px; opacity: .3;
+    animation: dot .8s ease-in-out infinite;
+  }
+  .dots span:nth-child(2) { animation-delay: .15s; }
+  .dots span:nth-child(3) { animation-delay: .3s; }
+  @keyframes dot { 0%,80%,100%{opacity:.3} 40%{opacity:1} }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     SIDEBAR
+════════════════════════════════════════════════ -->
+<div id="sidebar">
+  <div class="brand">
+    <div class="brand-icon">⚡</div>
+    <div class="brand-name">ML Predict</div>
+    <div class="brand-sub">XGBoost · v2.1.0</div>
+  </div>
+
+  <nav>
+    <a href="#" class="active" data-page="overview">
+      <span class="nav-icon">◈</span> Overview
+    </a>
+    <a href="#" data-page="predict">
+      <span class="nav-icon">▶</span> Predict
+    </a>
+    <a href="#" data-page="shap">
+      <span class="nav-icon">◉</span> SHAP Explorer
+    </a>
+    <a href="#" data-page="drift">
+      <span class="nav-icon">⊘</span> Drift Monitor
+    </a>
+    <a href="#" data-page="query">
+      <span class="nav-icon">✦</span> NL Query
+    </a>
+  </nav>
+
+  <div class="model-card">
+    <div class="model-card-label">Model Health</div>
+    <div class="model-card-row">Accuracy <span id="sb-acc">—</span></div>
+    <div class="model-card-row">AUC-ROC <span id="sb-auc">—</span></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     MAIN
+════════════════════════════════════════════════ -->
+<div id="main">
+
+  <!-- ── OVERVIEW ──────────────────────────────── -->
+  <div class="page active" id="page-overview">
+    <div class="page-header">
+      <div class="page-title">Model Overview</div>
+      <div class="page-sub">XGBoost prediction service · Live metrics</div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Accuracy</div>
+        <div class="stat-value" id="m-acc" style="color:var(--accent)">—</div>
+        <div class="stat-hint">Test set score</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">F1 Score</div>
+        <div class="stat-value" id="m-f1" style="color:var(--blue)">—</div>
+        <div class="stat-hint">Weighted average</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">AUC-ROC</div>
+        <div class="stat-value" id="m-auc" style="color:var(--purple)">—</div>
+        <div class="stat-hint">Binary classification</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Predictions</div>
+        <div class="stat-value" id="m-total" style="color:var(--amber)">—</div>
+        <div class="stat-hint">Total served</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">30-day performance trend</div>
+      <canvas id="metrics-chart" height="90"></canvas>
+    </div>
+  </div>
+
+  <!-- ── PREDICT ────────────────────────────────── -->
+  <div class="page" id="page-predict">
+    <div class="page-header">
+      <div class="page-title">Run Prediction</div>
+      <div class="page-sub">Enter feature values to get an XGBoost risk score.</div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <div class="card-title" style="margin:0">Feature Input</div>
+        <button class="btn btn-ghost" onclick="fillDemo()" style="font-size:12px;padding:6px 14px">Fill demo values</button>
+      </div>
+
+      <div class="form-grid" id="feature-form">
+        <div><label class="field-label">Age</label><input type="number" id="f-age" placeholder="35"/></div>
+        <div><label class="field-label">Annual Income ($)</label><input type="number" id="f-income" placeholder="75000"/></div>
+        <div><label class="field-label">Credit Score</label><input type="number" id="f-credit" placeholder="720"/></div>
+        <div><label class="field-label">Loan Amount ($)</label><input type="number" id="f-loan" placeholder="25000"/></div>
+        <div><label class="field-label">Employment Years</label><input type="number" id="f-emp" placeholder="5"/></div>
+        <div><label class="field-label">Debt-to-Income Ratio</label><input type="number" id="f-debt" placeholder="0.35" step="0.01"/></div>
+        <div><label class="field-label">Number of Accounts</label><input type="number" id="f-accounts" placeholder="4"/></div>
+      </div>
+
+      <div id="predict-error" style="display:none;margin-top:14px;padding:10px 14px;border-radius:8px;background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.2);color:var(--red);font-size:13px;"></div>
+
+      <button class="btn btn-primary" onclick="runPredict()" id="predict-btn" style="margin-top:20px;width:100%;justify-content:center;">
+        ▶ Predict
+      </button>
+    </div>
+
+    <div id="predict-result">
+      <div class="card">
+        <div id="result-banner" class="result-main"></div>
+        <div class="result-grid">
+          <div class="result-cell"><div class="result-cell-label">Probability</div><div class="result-cell-val" id="r-prob">—</div></div>
+          <div class="result-cell"><div class="result-cell-label">Confidence</div><div class="result-cell-val" id="r-conf">—</div></div>
+          <div class="result-cell"><div class="result-cell-label">Model</div><div class="result-cell-val" id="r-model" style="font-size:11px">—</div></div>
+          <div class="result-cell"><div class="result-cell-label">Latency</div><div class="result-cell-val" id="r-latency">—</div></div>
+        </div>
+        <div style="margin-top:14px;padding:12px 14px;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
+          <div class="result-cell-label">Prediction ID</div>
+          <div style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:3px;" id="r-id">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SHAP ───────────────────────────────────── -->
+  <div class="page" id="page-shap">
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div class="page-title">SHAP Explorer</div>
+        <div class="page-sub">Feature contributions via Shapley values.</div>
+      </div>
+      <button class="btn btn-ghost" onclick="loadShap()" style="font-size:12px;padding:7px 14px">↺ Refresh</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+      <div class="card" style="padding:16px 20px;">
+        <div class="stat-label">Base Value E[f(x)]</div>
+        <div class="stat-value" id="shap-base" style="color:var(--purple)">—</div>
+      </div>
+      <div class="card" style="padding:16px 20px;">
+        <div class="stat-label">Expected Output</div>
+        <div class="stat-value" id="shap-expected" style="color:var(--blue)">—</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Feature impact
+        <span style="float:right;font-size:11px;font-weight:400;text-transform:none;letter-spacing:0;">
+          <span style="color:var(--red)">■</span> increases risk &nbsp;
+          <span style="color:var(--accent)">■</span> decreases risk
+        </span>
+      </div>
+      <div id="shap-bars"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Breakdown table</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;" id="shap-table">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="text-align:left;padding:8px 10px;font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.05em;">Feature</th>
+            <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.05em;">Value</th>
+            <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.05em;">SHAP</th>
+            <th style="text-align:center;padding:8px 10px;font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.05em;">Direction</th>
+            <th style="text-align:left;padding:8px 10px;font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.05em;">Importance</th>
+          </tr>
+        </thead>
+        <tbody id="shap-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── DRIFT ──────────────────────────────────── -->
+  <div class="page" id="page-drift">
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div class="page-title">Drift Monitor</div>
+        <div class="page-sub">PSI & KS-test distribution monitoring.</div>
+      </div>
+      <button class="btn btn-ghost" onclick="loadDrift()" style="font-size:12px;padding:7px 14px">↺ Refresh</button>
+    </div>
+
+    <div id="drift-alert"></div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;">
+      <div class="stat-card"><div class="stat-label">PSI Threshold</div><div class="stat-value" id="d-psi-t" style="color:var(--amber)">0.20</div></div>
+      <div class="stat-card"><div class="stat-label">KS Threshold</div><div class="stat-value" id="d-ks-t" style="color:var(--purple)">0.05</div></div>
+      <div class="stat-card"><div class="stat-label">Drifted Features</div><div class="stat-value" id="d-count">—</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Feature drift scores</div>
+      <div id="drift-features"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">PSI trend — 14 days</div>
+      <canvas id="drift-chart" height="80"></canvas>
+    </div>
+  </div>
+
+  <!-- ── NL QUERY ───────────────────────────────── -->
+  <div class="page" id="page-query">
+    <div class="page-header">
+      <div class="page-title">Natural Language Query</div>
+      <div class="page-sub">Ask about your ML pipeline in plain English. Powered by LangChain.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Example queries</div>
+      <div class="chips">
+        <div class="chip" onclick="sendQuery(this.textContent)">What was prediction distribution last 7 days?</div>
+        <div class="chip" onclick="sendQuery(this.textContent)">Which features had highest SHAP values?</div>
+        <div class="chip" onclick="sendQuery(this.textContent)">Were any drift alerts triggered this week?</div>
+        <div class="chip" onclick="sendQuery(this.textContent)">What is average confidence for High Risk?</div>
+        <div class="chip" onclick="sendQuery(this.textContent)">Show model accuracy over last 30 days</div>
+      </div>
+
+      <div id="chat-messages"></div>
+
+      <div class="chat-input-row">
+        <textarea id="nl-input" rows="2" placeholder="Ask anything about your predictions, features, or model performance…"></textarea>
+        <button class="btn btn-primary" onclick="sendQuery()" id="nl-btn" style="align-self:flex-end">Send ↗</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;">Press Enter to send · Shift+Enter for new line</div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+const API = '';
+
+// ── Navigation ─────────────────────────────────────
+document.querySelectorAll('nav a').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelectorAll('nav a').forEach(x => x.classList.remove('active'));
+    a.classList.add('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + a.dataset.page).classList.add('active');
+    if (a.dataset.page === 'overview')  loadMetrics();
+    if (a.dataset.page === 'shap')      loadShap();
+    if (a.dataset.page === 'drift')     loadDrift();
+  });
+});
+
+// ── Charts ─────────────────────────────────────────
+let metricsChart = null, driftChart = null;
+
+Chart.defaults.color = '#5a5d78';
+Chart.defaults.borderColor = '#1c1e2e';
+Chart.defaults.font.family = "'Syne', sans-serif";
+
+function buildMetricsChart(history) {
+  const ctx = document.getElementById('metrics-chart');
+  if (metricsChart) metricsChart.destroy();
+  metricsChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: history.map(h => h.date),
+      datasets: [
+        { label: 'Accuracy', data: history.map(h => h.accuracy), borderColor: '#00e5b0', borderWidth: 2, pointRadius: 0, tension: 0.4, fill: false },
+        { label: 'F1 Score', data: history.map(h => h.f1),       borderColor: '#4d9fff', borderWidth: 2, pointRadius: 0, tension: 0.4, fill: false },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { boxWidth: 12, padding: 20, color: '#5a5d78' } } },
+      scales: {
+        x: { grid: { color: '#1c1e2e' }, ticks: { maxTicksLimit: 8 } },
+        y: { grid: { color: '#1c1e2e' }, min: 0.85, max: 1.0, ticks: { callback: v => (v*100).toFixed(0)+'%' } }
+      }
+    }
+  });
+}
+
+function buildDriftChart(history) {
+  const ctx = document.getElementById('drift-chart');
+  if (driftChart) driftChart.destroy();
+  driftChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: history.map(h => h.date),
+      datasets: [{
+        label: 'PSI', data: history.map(h => h.psi),
+        borderColor: '#ffb547', borderWidth: 2, pointRadius: 0, tension: 0.4,
+        fill: true, backgroundColor: 'rgba(255,181,71,.06)'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        annotation: { annotations: {
+          threshold: { type: 'line', yMin: 0.2, yMax: 0.2, borderColor: 'rgba(255,77,106,.5)', borderWidth: 1, borderDash: [4,4] }
+        }}
+      },
+      scales: {
+        x: { grid: { color: '#1c1e2e' }, ticks: { maxTicksLimit: 7 } },
+        y: { grid: { color: '#1c1e2e' }, min: 0, max: 0.4 }
+      }
+    }
+  });
+}
+
+// ── API helpers ─────────────────────────────────────
+async function apiFetch(path, opts={}) {
+  const res = await fetch(API + path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// ── Overview ────────────────────────────────────────
+async function loadMetrics() {
+  try {
+    const d = await apiFetch('/metrics');
+    document.getElementById('m-acc').textContent   = (d.current.accuracy * 100).toFixed(1) + '%';
+    document.getElementById('m-f1').textContent    = d.current.f1.toFixed(3);
+    document.getElementById('m-auc').textContent   = d.current.auc.toFixed(3);
+    document.getElementById('m-total').textContent = d.current.total_predictions.toLocaleString();
+    document.getElementById('sb-acc').textContent  = (d.current.accuracy * 100).toFixed(1) + '%';
+    document.getElementById('sb-auc').textContent  = d.current.auc.toFixed(3);
+    buildMetricsChart(d.history);
+  } catch(e) { console.error(e); }
+}
+
+// ── Predict ─────────────────────────────────────────
+function fillDemo() {
+  document.getElementById('f-age').value      = 34;
+  document.getElementById('f-income').value   = 82000;
+  document.getElementById('f-credit').value   = 715;
+  document.getElementById('f-loan').value     = 28000;
+  document.getElementById('f-emp').value      = 6;
+  document.getElementById('f-debt').value     = 0.32;
+  document.getElementById('f-accounts').value = 5;
+}
+
+async function runPredict() {
+  const btn = document.getElementById('predict-btn');
+  const err = document.getElementById('predict-error');
+  err.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Running…';
+
+  const body = {
+    age:              parseFloat(document.getElementById('f-age').value),
+    income:           parseFloat(document.getElementById('f-income').value),
+    credit_score:     parseFloat(document.getElementById('f-credit').value),
+    loan_amount:      parseFloat(document.getElementById('f-loan').value),
+    employment_years: parseFloat(document.getElementById('f-emp').value),
+    debt_ratio:       parseFloat(document.getElementById('f-debt').value),
+    num_accounts:     parseInt(document.getElementById('f-accounts').value),
+  };
+
+  try {
+    const d = await apiFetch('/predict', { method: 'POST', body: JSON.stringify(body) });
+    const isHigh = d.label === 'High Risk';
+
+    document.getElementById('result-banner').innerHTML = `
+      <span class="result-icon">${isHigh ? '⚠' : '✓'}</span>
+      <div>
+        <div class="result-label" style="color:${isHigh ? 'var(--red)' : 'var(--accent)'}">${d.label}</div>
+        <div class="result-conf">Model confidence: ${(d.confidence*100).toFixed(1)}%</div>
+      </div>
+    `;
+    document.getElementById('result-banner').style.background = isHigh ? 'rgba(255,77,106,.06)' : 'rgba(0,229,176,.06)';
+    document.getElementById('result-banner').style.border = `1px solid ${isHigh ? 'rgba(255,77,106,.25)' : 'rgba(0,229,176,.2)'}`;
+
+    document.getElementById('r-prob').style.color    = isHigh ? 'var(--red)' : 'var(--accent)';
+    document.getElementById('r-prob').textContent    = (d.probability*100).toFixed(1)+'%';
+    document.getElementById('r-conf').textContent    = (d.confidence*100).toFixed(1)+'%';
+    document.getElementById('r-conf').style.color    = 'var(--blue)';
+    document.getElementById('r-model').textContent   = d.model_version;
+    document.getElementById('r-model').style.color   = 'var(--purple)';
+    document.getElementById('r-latency').textContent = d.latency_ms+'ms';
+    document.getElementById('r-latency').style.color = 'var(--amber)';
+    document.getElementById('r-id').textContent      = d.prediction_id;
+
+    document.getElementById('predict-result').style.display = 'block';
+  } catch(e) {
+    err.textContent = 'Prediction failed — is the FastAPI server running on port 8000?';
+    err.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '▶ Predict';
+  }
+}
+
+// ── SHAP ────────────────────────────────────────────
+async function loadShap() {
+  try {
+    const d = await apiFetch('/shap/latest');
+    document.getElementById('shap-base').textContent     = d.base_value.toFixed(4);
+    document.getElementById('shap-expected').textContent = d.expected_value.toFixed(4);
+
+    const maxAbs = Math.max(...d.features.map(f => Math.abs(f.shap_value)));
+    const barsEl = document.getElementById('shap-bars');
+    barsEl.innerHTML = '';
+    d.features.forEach(f => {
+      const pct = (Math.abs(f.shap_value) / maxAbs * 100).toFixed(1);
+      const pos = f.shap_value >= 0;
+      const color = pos ? 'var(--red)' : 'var(--accent)';
+      barsEl.innerHTML += `
+        <div class="shap-row">
+          <div class="shap-name">${f.name}</div>
+          <div class="shap-bar-wrap">
+            <div class="shap-bar" style="width:${pct}%;background:${color};"></div>
+          </div>
+          <div class="shap-val" style="color:${color};">${pos?'+':''}${f.shap_value.toFixed(4)}</div>
+        </div>`;
+    });
+
+    const tbody = document.getElementById('shap-tbody');
+    tbody.innerHTML = '';
+    d.features.forEach(f => {
+      const pos = f.shap_value >= 0;
+      tbody.innerHTML += `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:10px;font-weight:500;">${f.name}</td>
+        <td style="padding:10px;text-align:right;font-family:var(--mono);color:var(--muted);">${f.feature_value}</td>
+        <td style="padding:10px;text-align:right;font-family:var(--mono);color:${pos?'var(--red)':'var(--accent)'};">${pos?'+':''}${f.shap_value.toFixed(4)}</td>
+        <td style="padding:10px;text-align:center;"><span class="tag ${pos?'tag-red':'tag-green'}">${pos?'↑ Risk':'↓ Risk'}</span></td>
+        <td style="padding:10px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:60px;height:4px;background:var(--bg);border-radius:2px;">
+              <div style="width:${Math.min(f.importance*100,100).toFixed(0)}%;height:100%;background:var(--purple);border-radius:2px;"></div>
+            </div>
+            <span style="font-size:11px;font-family:var(--mono);color:var(--muted);">${f.importance.toFixed(2)}</span>
+          </div>
+        </td>
+      </tr>`;
+    });
+  } catch(e) { console.error(e); }
+}
+
+// ── Drift ────────────────────────────────────────────
+async function loadDrift() {
+  try {
+    const d = await apiFetch('/drift');
+    const drifted = d.features.filter(f => f.drift_detected).length;
+    const isAlert = d.overall_drift_detected;
+
+    document.getElementById('drift-alert').innerHTML = isAlert
+      ? `<div class="alert-banner alert-danger">⚠ Drift detected in ${drifted} feature${drifted!==1?'s':''} — ${d.features.filter(f=>f.drift_detected).map(f=>f.name).join(', ')}</div>`
+      : `<div class="alert-banner alert-success">✓ All features stable — no significant drift detected</div>`;
+
+    document.getElementById('d-count').textContent = `${drifted} / ${d.features.length}`;
+    document.getElementById('d-count').style.color = isAlert ? 'var(--red)' : 'var(--accent)';
+
+    const featEl = document.getElementById('drift-features');
+    featEl.innerHTML = '';
+    d.features.forEach(f => {
+      const psiOver = f.psi_score > d.psi_threshold;
+      const ksOver  = f.ks_statistic > d.ks_threshold;
+      featEl.innerHTML += `
+        <div class="drift-row ${f.drift_detected?'drifted':''}">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="drift-name">${f.name}</div>
+            <span class="tag ${f.drift_detected?'tag-red':'tag-green'}">${f.drift_detected?'⚠ Drift':'✓ Stable'}</span>
+            <span class="tag tag-blue" style="font-size:10px;">${f.trend}</span>
+          </div>
+          <div class="drift-scores">
+            <div class="drift-score-item">
+              <div class="drift-score-label">PSI</div>
+              <div style="color:${psiOver?'var(--red)':'var(--accent)'};font-family:var(--mono);">${f.psi_score.toFixed(4)}</div>
+            </div>
+            <div class="drift-score-item">
+              <div class="drift-score-label">KS</div>
+              <div style="color:${ksOver?'var(--red)':'var(--accent)'};font-family:var(--mono);">${f.ks_statistic.toFixed(4)}</div>
+            </div>
+          </div>
+        </div>`;
+    });
+
+    buildDriftChart(d.history);
+  } catch(e) { console.error(e); }
+}
+
+// ── NL Query ─────────────────────────────────────────
+document.getElementById('nl-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuery(); }
+});
+
+async function sendQuery(text) {
+  const input = document.getElementById('nl-input');
+  const query = text || input.value.trim();
+  if (!query) return;
+  input.value = '';
+
+  const msgs = document.getElementById('chat-messages');
+  msgs.innerHTML += `<div class="msg-user">${query}</div>`;
+
+  const loading = document.createElement('div');
+  loading.className = 'msg-bot';
+  loading.innerHTML = `<div class="msg-bot-answer"><span class="dots"><span></span><span></span><span></span></span></div>`;
+  msgs.appendChild(loading);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  const btn = document.getElementById('nl-btn');
+  btn.disabled = true;
+
+  try {
+    const d = await apiFetch('/query', { method: 'POST', body: JSON.stringify({ query }) });
+    loading.innerHTML = `
+      <div class="msg-bot-tag">✦ LangChain Response</div>
+      <div class="msg-bot-answer">${d.answer}</div>
+      ${d.sql ? `<div style="font-size:10px;color:var(--purple);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin:4px 0 3px;">Generated SQL</div><div class="msg-bot-sql">${d.sql}</div>` : ''}
+    `;
+  } catch(e) {
+    loading.innerHTML = `<div class="msg-bot-answer" style="color:var(--red)">Failed to connect. Is FastAPI running on port 8000?</div>`;
+  } finally {
+    btn.disabled = false;
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+}
+
+// ── Boot ─────────────────────────────────────────────
+loadMetrics();
+</script>
+</body>
+</html>
