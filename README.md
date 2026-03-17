@@ -1,109 +1,96 @@
-# ML Prediction Service — FastAPI Backend
+# ML Prediction Service
 
-Replaces the Node.js/Express proxy entirely. The React frontend talks directly to FastAPI.
-
-## Architecture
-
-```
-React (port 5173)
-     │  /api/* → proxy strips /api prefix
-     ▼
-FastAPI (port 8000)
-     ├── POST /predict        XGBoost inference
-     ├── POST /shap           SHAP TreeExplainer values
-     ├── GET  /shap/:id       SHAP by prediction ID
-     ├── GET  /drift          PSI + KS drift report
-     ├── POST /query          LangChain NL query
-     ├── GET  /metrics        Model performance metrics
-     └── GET  /health         Health check
-```
-
-## Stack
-
-| Component | Tech |
-|-----------|------|
-| Web framework | FastAPI 0.110 + Uvicorn |
-| ML model | XGBoost 2.0 |
-| Explainability | SHAP (TreeExplainer) |
-| Drift detection | PSI + KS-test (SciPy) |
-| NL querying | LangChain + GPT-4 (optional) |
-| Validation | Pydantic v2 |
+AI-powered risk prediction with drift detection, SHAP explainability, and natural language querying.
 
 ## Project Structure
 
 ```
-ml-fastapi/
-├── main.py                  # FastAPI app, CORS, router registration
-├── requirements.txt
-├── .env.example
-├── app/
-│   ├── schemas.py           # Pydantic request/response models
-│   ├── ml_service.py        # XGBoost training + SHAP inference
-│   ├── drift_service.py     # PSI + KS drift detection
-│   ├── nl_service.py        # LangChain NL query handler
-│   └── metrics_service.py   # Model metrics + 30-day history
-└── routers/
-    ├── predict.py
-    ├── shap.py
-    ├── drift.py
-    ├── query.py
-    └── metrics.py
+ml-simple/
+├── main.py           ← entire backend (FastAPI + XGBoost + SHAP + Drift + LangChain)
+├── index.html        ← entire frontend (dashboard UI)
+└── requirements.txt  ← all dependencies
 ```
 
-## Setup
+That's it. No subfolders, no config files, no build tools.
 
-### 1. Create a virtual environment
-```bash
-python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
-```
+## Stack
 
-### 2. Install dependencies
+| What | Tech |
+|------|------|
+| Web framework | FastAPI + Uvicorn |
+| ML model | XGBoost |
+| Explainability | SHAP (TreeExplainer) |
+| Drift detection | PSI + KS-test (SciPy) |
+| NL querying | LangChain + GPT-4 (optional) |
+| Frontend | Plain HTML + Chart.js |
+
+## Setup & Run
+
+### 1. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Configure environment (optional)
+### 2. (Optional) Add OpenAI key for real NL queries
+Create a `.env` file in the same folder:
+```
+OPENAI_API_KEY=sk-...
+```
+Without it, the NL Query page still works using built-in rule-based responses.
+
+### 3. Run
 ```bash
-cp .env.example .env
-# Add OPENAI_API_KEY to enable real LangChain NL queries
+uvicorn main:app --reload
 ```
 
-### 4. Start FastAPI
-```bash
-uvicorn main:app --reload --port 8000
+Then open **http://localhost:8000** in your browser.
+
+## Features
+
+| Page | What it does |
+|------|-------------|
+| Overview | 30-day accuracy & F1 trend charts, key model metrics |
+| Predict | Input features → XGBoost risk score + confidence |
+| SHAP Explorer | Feature contribution waterfall chart + breakdown table |
+| Drift Monitor | PSI & KS-test scores per feature, 14-day history chart |
+| NL Query | Ask questions in plain English, get answers + generated SQL |
+
+## API Endpoints
+
+All endpoints are also available directly at `http://localhost:8000/docs`.
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| `GET` | `/` | Serves the dashboard (index.html) |
+| `POST` | `/predict` | Run XGBoost prediction |
+| `POST` | `/shap` | Get SHAP values for a feature set |
+| `GET` | `/shap/{id}` | Get SHAP values by prediction ID |
+| `GET` | `/drift` | Run drift detection report |
+| `POST` | `/query` | Natural language query |
+| `GET` | `/metrics` | Model performance metrics |
+| `GET` | `/health` | Health check |
+
+## How main.py is organized
+
+The entire backend lives in one file, split into clearly labeled sections:
+
+```
+# ══════ SCHEMAS        — Pydantic request/response models
+# ══════ ML SERVICE     — XGBoost training + SHAP inference
+# ══════ DRIFT SERVICE  — PSI + KS-test drift detection
+# ══════ NL QUERY       — LangChain or rule-based fallback
+# ══════ METRICS        — 30-day performance history
+# ══════ FASTAPI APP    — app setup + all routes
 ```
 
-The server trains an XGBoost model on synthetic data at startup (~3 seconds).
+## Connecting a Real Model
 
-### 5. Start React frontend (separate terminal)
-```bash
-# In ml-dashboard/
-npm install && npm run dev
-```
+Replace the `_train()` method in the `MLService` class inside `main.py`:
 
-## API Explorer
-
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-## Connecting to a Real Model
-
-Replace the `_train()` method in `app/ml_service.py`:
 ```python
 import joblib
-self.model = joblib.load("models/xgb_production.pkl")
-self.explainer = shap.TreeExplainer(self.model)
+
+def _train(self):
+    self.model     = joblib.load("your_model.pkl")
+    self.explainer = shap.TreeExplainer(self.model)
 ```
-
-## NL Query (LangChain)
-
-Without `OPENAI_API_KEY`, the service uses smart rule-based responses that cover:
-- Prediction distribution queries
-- SHAP / feature importance questions
-- Drift alert queries
-- Accuracy / performance metrics
-- Latency stats
-- Confidence breakdowns
-
-Set `OPENAI_API_KEY` to enable full GPT-4 powered SQL generation.
